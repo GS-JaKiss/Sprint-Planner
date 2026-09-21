@@ -49,15 +49,41 @@ type CapacityTooltip = {
   left: number;
 };
 
-const PEOPLE: Person[] = [
+const DEFAULT_PEOPLE: Person[] = [
   { id: "janos-kiss", name: "Janos Kiss", initials: "JK", role: "Frontend", color: "#d75d3b", softColor: "#f8ddd3" },
   { id: "hornich-gergely", name: "Hornich Gergely", initials: "HG", role: "Frontend", color: "#287b67", softColor: "#d7ebe5" },
   { id: "licsauer-mark", name: "Licsauer Mark", initials: "LM", role: "Frontend", color: "#4169a1", softColor: "#dce6f4" },
   { id: "bodnar-erik", name: "Bodnar Erik", initials: "BE", role: "Backend", color: "#a76b18", softColor: "#f4e5c8" },
-  { id: "kiss-renate", name: "Kiss Renate", initials: "KR", role: "QA", color: "#8a5575", softColor: "#ecdde7" },
+  { id: "kiss-renata", name: "Kiss Renata", initials: "KR", role: "QA", color: "#8a5575", softColor: "#ecdde7" },
   { id: "hajder-kinga", name: "Hajder Kinga", initials: "HK", role: "QA", color: "#39758f", softColor: "#dceaf0" },
   { id: "pocs-david", name: "Pocs David", initials: "PD", role: "QA", color: "#68733d", softColor: "#e5e9d5" },
 ];
+
+const PERSON_COLORS = [
+  { color: "#d75d3b", softColor: "#f8ddd3" },
+  { color: "#287b67", softColor: "#d7ebe5" },
+  { color: "#4169a1", softColor: "#dce6f4" },
+  { color: "#a76b18", softColor: "#f4e5c8" },
+  { color: "#8a5575", softColor: "#ecdde7" },
+  { color: "#39758f", softColor: "#dceaf0" },
+  { color: "#68733d", softColor: "#e5e9d5" },
+];
+
+const getInitials = (name: string) => name
+  .trim()
+  .split(/\s+/)
+  .slice(0, 2)
+  .map((part) => part[0]?.toUpperCase() ?? "")
+  .join("");
+
+const readStoredPeople = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem("sprint-planner:people") ?? "null") as Person[] | null;
+    return Array.isArray(stored) ? stored : DEFAULT_PEOPLE;
+  } catch {
+    return DEFAULT_PEOPLE;
+  }
+};
 
 const ISSUE_COLORS = [
   "#b84e32",
@@ -86,11 +112,11 @@ const DEMO_ISSUES: PlannedIssue[] = [
   { id: "10006", key: "WEB-260", summary: "Document support escalation states", type: "Task", priority: "Low", status: "To Do", assignments: {} },
 ];
 
-const readStoredIssues = () => {
+const readStoredIssues = (people: Person[]) => {
   try {
     const value = localStorage.getItem("sprint-planner:issues");
     const stored: StoredIssue[] = value ? JSON.parse(value) as StoredIssue[] : DEMO_ISSUES;
-    const personIds = new Set(PEOPLE.map((person) => person.id));
+    const personIds = new Set(people.map((person) => person.id));
     return stored.map((issue) => {
       const savedIds = Array.isArray(issue.assigneeIds) ? issue.assigneeIds : issue.assigneeId ? [issue.assigneeId] : [];
       const assignments = issue.assignments
@@ -113,12 +139,12 @@ const normalizeName = (value: string) => value
   .replace(/[^a-z0-9]+/g, " ")
   .trim();
 
-const findPersonId = (value: string) => {
+const findPersonId = (value: string, people: Person[]) => {
   const candidateTokens = new Set(normalizeName(value).split(" "));
-  return PEOPLE.find((person) => normalizeName(person.name).split(" ").every((token) => candidateTokens.has(token)))?.id;
+  return people.find((person) => normalizeName(person.name).split(" ").every((token) => candidateTokens.has(token)))?.id;
 };
 
-const parseTextIssues = (text: string) => {
+const parseTextIssues = (text: string, people: Person[]) => {
   const issues: PlannedIssue[] = [];
   const ignoredLines: string[] = [];
   const priorities = new Set(["low", "medium", "high", "highest", "critical"]);
@@ -149,7 +175,7 @@ const parseTextIssues = (text: string) => {
       } else if (priorities.has(part.toLowerCase())) {
         priority = part;
       } else if (part.toLowerCase() !== "unassigned") {
-        const personId = findPersonId(part);
+        const personId = findPersonId(part, people);
         if (personId) assigneeIds.push(personId);
       }
     }
@@ -176,10 +202,10 @@ const readStoredOrders = () => {
   }
 };
 
-const readHiddenPeople = () => {
+const readHiddenPeople = (people: Person[]) => {
   try {
     const stored = JSON.parse(localStorage.getItem("sprint-planner:hidden-people") ?? "[]") as string[];
-    const personIds = new Set(PEOPLE.map((person) => person.id));
+    const personIds = new Set(people.map((person) => person.id));
     return stored.filter((id) => personIds.has(id));
   } catch {
     return [];
@@ -188,13 +214,14 @@ const readHiddenPeople = () => {
 
 function App() {
   const capacityPanelRef = useRef<HTMLDivElement>(null);
-  const [issues, setIssues] = useState<PlannedIssue[]>(readStoredIssues);
+  const [people, setPeople] = useState<Person[]>(readStoredPeople);
+  const [issues, setIssues] = useState<PlannedIssue[]>(() => readStoredIssues(people));
   const [sprintName, setSprintName] = useState(() => localStorage.getItem("sprint-planner:name") ?? "August checkout sprint");
   const [sprintDays, setSprintDays] = useState(() => Number(localStorage.getItem("sprint-planner:days")) || 10);
   const [fillerDays, setFillerDays] = useState(() => Number(localStorage.getItem("sprint-planner:filler-days")) || 0);
   const [fillerDaysDraft, setFillerDaysDraft] = useState(() => String(Number(localStorage.getItem("sprint-planner:filler-days")) || 0));
   const [personOrders, setPersonOrders] = useState<Record<string, string[]>>(readStoredOrders);
-  const [hiddenPersonIds, setHiddenPersonIds] = useState<string[]>(readHiddenPeople);
+  const [hiddenPersonIds, setHiddenPersonIds] = useState<string[]>(() => readHiddenPeople(people));
   const [draggedSegment, setDraggedSegment] = useState("");
   const [capacityTooltip, setCapacityTooltip] = useState<CapacityTooltip | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copying" | "copied" | "error">("idle");
@@ -204,12 +231,18 @@ function App() {
   const [isManualOpen, setManualOpen] = useState(false);
   const [isTextImportOpen, setTextImportOpen] = useState(false);
   const [isImportOpen, setImportOpen] = useState(false);
+  const [isTeamOpen, setTeamOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
   const [importCount, setImportCount] = useState<number | null>(null);
   const [connection, setConnection] = useState<JiraConnection>({ boardUrl: "", email: "", apiToken: "" });
   const [manualIssue, setManualIssue] = useState({ key: "", summary: "", type: "Task", priority: "Medium", assignments: {} as Record<string, number> });
   const [textImport, setTextImport] = useState("");
+  const [newPerson, setNewPerson] = useState({ name: "", role: "" });
+
+  useEffect(() => {
+    localStorage.setItem("sprint-planner:people", JSON.stringify(people));
+  }, [people]);
 
   useEffect(() => {
     localStorage.setItem("sprint-planner:issues", JSON.stringify(issues));
@@ -254,12 +287,12 @@ function App() {
     return issues.filter((issue) => `${issue.key} ${issue.summary}`.toLowerCase().includes(normalizedQuery));
   }, [issues, query]);
 
-  const parsedTextImport = useMemo(() => parseTextIssues(textImport), [textImport]);
+  const parsedTextImport = useMemo(() => parseTextIssues(textImport, people), [people, textImport]);
 
-  const assignedDays = issues.reduce((total, issue) => total + Object.values(issue.assignments).reduce((sum, days) => sum + days, 0), 0) + fillerDays * PEOPLE.length;
+  const assignedDays = issues.reduce((total, issue) => total + Object.values(issue.assignments).reduce((sum, days) => sum + days, 0), 0) + fillerDays * people.length;
   const unassignedCount = issues.filter((issue) => Object.keys(issue.assignments).length === 0).length;
-  const availableDays = PEOPLE.length * sprintDays;
-  const visiblePeople = PEOPLE.filter((person) => !hiddenPersonIds.includes(person.id));
+  const availableDays = people.length * sprintDays;
+  const visiblePeople = people.filter((person) => !hiddenPersonIds.includes(person.id));
   const visibleAssignedDays = visiblePeople.reduce((total, person) => total + fillerDays + issues.reduce(
     (personTotal, issue) => personTotal + (issue.assignments[person.id] ?? 0),
     0,
@@ -270,6 +303,39 @@ function App() {
     setHiddenPersonIds((current) => current.includes(personId)
       ? current.filter((id) => id !== personId)
       : [...current, personId]);
+  };
+
+  const addPerson = (event: React.FormEvent) => {
+    event.preventDefault();
+    const name = newPerson.name.trim();
+    const role = newPerson.role.trim();
+    if (!name) return;
+    const palette = PERSON_COLORS[people.length % PERSON_COLORS.length];
+    setPeople((current) => [...current, {
+      id: `person-${crypto.randomUUID()}`,
+      name,
+      initials: getInitials(name),
+      role: role || "Team member",
+      ...palette,
+    }]);
+    setNewPerson({ name: "", role: "" });
+  };
+
+  const removePerson = (personId: string) => {
+    setPeople((current) => current.filter((person) => person.id !== personId));
+    setIssues((current) => current.map((issue) => {
+      const { [personId]: _removed, ...assignments } = issue.assignments;
+      return { ...issue, assignments };
+    }));
+    setHiddenPersonIds((current) => current.filter((id) => id !== personId));
+    setPersonOrders((current) => {
+      const { [personId]: _removed, ...remaining } = current;
+      return remaining;
+    });
+    setManualIssue((current) => {
+      const { [personId]: _removed, ...assignments } = current.assignments;
+      return { ...current, assignments };
+    });
   };
 
   const copyCapacityImage = async () => {
@@ -450,7 +516,7 @@ function App() {
         <section className="summary-strip" aria-label="Sprint summary">
           <div className="summary-item"><span className="summary-icon rust"><Clock3 size={18} /></span><div><strong>{assignedDays}</strong><span>days planned</span></div></div>
           <div className="summary-item"><span className="summary-icon green"><Gauge size={18} /></span><div><strong>{availableDays - assignedDays}</strong><span>days remaining</span></div></div>
-          <div className="summary-item"><span className="summary-icon blue"><Users size={18} /></span><div><strong>{PEOPLE.length}</strong><span>people</span></div></div>
+          <div className="summary-item"><span className="summary-icon blue"><Users size={18} /></span><div><strong>{people.length}</strong><span>people</span></div></div>
           <div className="summary-item"><span className="summary-icon gold"><CircleAlert size={18} /></span><div><strong>{unassignedCount}</strong><span>unassigned</span></div></div>
         </section>
 
@@ -480,10 +546,10 @@ function App() {
                         setPeopleMenuPosition((current) => ({ ...current, [issue.id]: { top, left: Math.max(8, bounds.right - 270) } }));
                       }}
                     >
-                      <span className="avatar-stack">{Object.keys(issue.assignments).slice(0, 3).map((id) => <Avatar key={id} person={PEOPLE.find((person) => person.id === id)!} small />)}{Object.keys(issue.assignments).length === 0 && <span className="empty-avatar">?</span>}</span>
+                      <span className="avatar-stack">{Object.keys(issue.assignments).slice(0, 3).map((id) => <Avatar key={id} person={people.find((person) => person.id === id)!} small />)}{Object.keys(issue.assignments).length === 0 && <span className="empty-avatar">?</span>}</span>
                       <span>{Object.keys(issue.assignments).length ? `${Object.keys(issue.assignments).length} selected` : "Unassigned"}</span><ChevronDown size={14} />
                     </summary>
-                    <div className="people-menu" style={peopleMenuPosition[issue.id]}>{PEOPLE.map((person) => { const draftKey = `${issue.id}:${person.id}`; return <div className="assignment-row" key={person.id}><label><input type="checkbox" checked={person.id in issue.assignments} onChange={() => updateIssue(issue.id, "assignments", toggleAssignment(issue.assignments, person.id))} /><Avatar person={person} small /><span>{person.name}<small>{person.role}</small></span></label>{person.id in issue.assignments && <label className="assignment-days"><input type="number" min="0.5" max="30" step="0.5" value={assignmentDrafts[draftKey] ?? String(issue.assignments[person.id])} onChange={(event) => setAssignmentDrafts((current) => ({ ...current, [draftKey]: event.target.value }))} onBlur={() => commitAssignmentDays(issue.id, person.id, issue.assignments[person.id])} aria-label={`Days for ${person.name} on ${issue.key}`} /><span>d</span></label>}</div>; })}</div>
+                    <div className="people-menu" style={peopleMenuPosition[issue.id]}>{people.map((person) => { const draftKey = `${issue.id}:${person.id}`; return <div className="assignment-row" key={person.id}><label><input type="checkbox" checked={person.id in issue.assignments} onChange={() => updateIssue(issue.id, "assignments", toggleAssignment(issue.assignments, person.id))} /><Avatar person={person} small /><span>{person.name}<small>{person.role}</small></span></label>{person.id in issue.assignments && <label className="assignment-days"><input type="number" min="0.5" max="30" step="0.5" value={assignmentDrafts[draftKey] ?? String(issue.assignments[person.id])} onChange={(event) => setAssignmentDrafts((current) => ({ ...current, [draftKey]: event.target.value }))} onBlur={() => commitAssignmentDays(issue.id, person.id, issue.assignments[person.id])} aria-label={`Days for ${person.name} on ${issue.key}`} /><span>d</span></label>}</div>; })}</div>
                   </details>
                   <div className="allocation-total"><strong>{Object.values(issue.assignments).reduce((total, days) => total + days, 0)}d</strong><span>total</span></div>
                   <button className="remove-button" onClick={() => setIssues((current) => current.filter((item) => item.id !== issue.id))} aria-label={`Remove ${issue.key}`} title="Remove issue"><Trash2 size={16} /></button>
@@ -500,6 +566,9 @@ function App() {
             <div className="section-header capacity-heading">
               <div><h2>Team capacity</h2><span>Each column is one whole day</span></div>
               <div className="capacity-tools">
+                <button className="export-capacity-button" type="button" onClick={() => setTeamOpen(true)} title="Add or remove team members">
+                  <Settings2 size={15} /><span>Manage team</span>
+                </button>
                 <button className={`export-capacity-button ${copyStatus}`} type="button" onClick={copyCapacityImage} disabled={copyStatus === "copying"} title="Copy Team Capacity as an image">
                   {copyStatus === "copied" ? <Check size={15} /> : <Copy size={15} />}
                   <span>{copyStatus === "copying" ? "Copying..." : copyStatus === "copied" ? "Copied" : copyStatus === "error" ? "Copy failed" : "Copy image"}</span>
@@ -508,7 +577,7 @@ function App() {
                   <summary><Users size={14} /><span>{visiblePeople.length} shown</span><ChevronDown size={12} /></summary>
                   <div className="capacity-visibility-menu">
                     <div className="visibility-menu-header"><strong>Visible people</strong><button type="button" onClick={() => setHiddenPersonIds([])}>Show all</button></div>
-                    {PEOPLE.map((person) => <label key={person.id}><input type="checkbox" checked={!hiddenPersonIds.includes(person.id)} onChange={() => togglePersonVisibility(person.id)} /><Avatar person={person} small /><span>{person.name}<small>{person.role}</small></span></label>)}
+                    {people.map((person) => <label key={person.id}><input type="checkbox" checked={!hiddenPersonIds.includes(person.id)} onChange={() => togglePersonVisibility(person.id)} /><Avatar person={person} small /><span>{person.name}<small>{person.role}</small></span></label>)}
                   </div>
                 </details>
                 <label>Filler <input type="number" min="0" max={sprintDays} step="0.5" value={fillerDaysDraft} onChange={(event) => setFillerDaysDraft(event.target.value)} onBlur={() => { const nextDays = fillerDaysDraft.trim() ? Number(fillerDaysDraft) : fillerDays; const normalized = Math.max(0, Math.min(sprintDays, Math.round(nextDays * 2) / 2)); setFillerDays(normalized); setFillerDaysDraft(String(normalized)); }} aria-label="Filler days per person" />d each</label>
@@ -628,7 +697,7 @@ function App() {
               <label>Summary<input autoFocus required value={manualIssue.summary} onChange={(event) => setManualIssue({ ...manualIssue, summary: event.target.value })} placeholder="What needs to be done?" /></label>
               <div className="form-row manual-key-row">
                 <label>Key (optional)<input value={manualIssue.key} onChange={(event) => setManualIssue({ ...manualIssue, key: event.target.value })} placeholder="BIMC-123" /></label>
-                <fieldset className="manual-people"><legend>People &amp; days</legend>{PEOPLE.map((person) => { const draftKey = `manual:${person.id}`; return <div className="assignment-row" key={person.id}><label><input type="checkbox" checked={person.id in manualIssue.assignments} onChange={() => setManualIssue({ ...manualIssue, assignments: toggleAssignment(manualIssue.assignments, person.id) })} /><Avatar person={person} small /><span>{person.name}<small>{person.role}</small></span></label>{person.id in manualIssue.assignments && <label className="assignment-days"><input type="number" min="0.5" max="30" step="0.5" value={assignmentDrafts[draftKey] ?? String(manualIssue.assignments[person.id])} onChange={(event) => setAssignmentDrafts((current) => ({ ...current, [draftKey]: event.target.value }))} onBlur={() => { const draft = assignmentDrafts[draftKey]; setManualIssue((current) => ({ ...current, assignments: { ...current.assignments, [person.id]: clampDays(draft?.trim() ? Number(draft) : current.assignments[person.id]) } })); setAssignmentDrafts((current) => { const { [draftKey]: _committed, ...remaining } = current; return remaining; }); }} aria-label={`Days for ${person.name}`} /><span>d</span></label>}</div>; })}</fieldset>
+                <fieldset className="manual-people"><legend>People &amp; days</legend>{people.map((person) => { const draftKey = `manual:${person.id}`; return <div className="assignment-row" key={person.id}><label><input type="checkbox" checked={person.id in manualIssue.assignments} onChange={() => setManualIssue({ ...manualIssue, assignments: toggleAssignment(manualIssue.assignments, person.id) })} /><Avatar person={person} small /><span>{person.name}<small>{person.role}</small></span></label>{person.id in manualIssue.assignments && <label className="assignment-days"><input type="number" min="0.5" max="30" step="0.5" value={assignmentDrafts[draftKey] ?? String(manualIssue.assignments[person.id])} onChange={(event) => setAssignmentDrafts((current) => ({ ...current, [draftKey]: event.target.value }))} onBlur={() => { const draft = assignmentDrafts[draftKey]; setManualIssue((current) => ({ ...current, assignments: { ...current.assignments, [person.id]: clampDays(draft?.trim() ? Number(draft) : current.assignments[person.id]) } })); setAssignmentDrafts((current) => { const { [draftKey]: _committed, ...remaining } = current; return remaining; }); }} aria-label={`Days for ${person.name}`} /><span>d</span></label>}</div>; })}</fieldset>
               </div>
               <div className="form-row manual-options-row">
                 <label>Type<select value={manualIssue.type} onChange={(event) => setManualIssue({ ...manualIssue, type: event.target.value })}><option>Task</option><option>Story</option><option>Bug</option></select></label>
@@ -658,6 +727,33 @@ function App() {
               {importError && <div className="form-message error"><CircleAlert size={16} />{importError}</div>}
               {importCount !== null && <div className="form-message success"><Check size={16} />Imported {importCount} issues successfully.</div>}
               <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setImportOpen(false)}>Cancel</button><button className="primary-button" disabled={importing}>{importing ? "Importing…" : "Import issues"}</button></div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isTeamOpen && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setTeamOpen(false); }}>
+          <div className="modal team-modal" role="dialog" aria-modal="true" aria-labelledby="team-title">
+            <button className="modal-close" onClick={() => setTeamOpen(false)} aria-label="Close"><X size={19} /></button>
+            <div className="modal-icon team"><Users size={22} /></div>
+            <p className="eyebrow">Sprint roster</p>
+            <h2 id="team-title">Manage team</h2>
+            <p className="modal-copy">Add people to assignment lists and capacity planning. Removing someone also clears their current assignments.</p>
+            <div className="team-list">
+              {people.map((person) => (
+                <div className="team-member" key={person.id}>
+                  <Avatar person={person} />
+                  <div><strong>{person.name}</strong><span>{person.role}</span></div>
+                  <button className="remove-button" type="button" onClick={() => removePerson(person.id)} aria-label={`Remove ${person.name}`} title="Remove team member"><Trash2 size={16} /></button>
+                </div>
+              ))}
+              {people.length === 0 && <div className="team-empty">No team members yet.</div>}
+            </div>
+            <form className="add-person-form" onSubmit={addPerson}>
+              <label>Name<input required value={newPerson.name} onChange={(event) => setNewPerson({ ...newPerson, name: event.target.value })} placeholder="Full name" /></label>
+              <label>Role<input value={newPerson.role} onChange={(event) => setNewPerson({ ...newPerson, role: event.target.value })} placeholder="Role (optional)" /></label>
+              <button className="primary-button" type="submit"><Plus size={16} /> Add member</button>
             </form>
           </div>
         </div>

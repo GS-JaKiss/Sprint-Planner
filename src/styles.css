@@ -105,6 +105,19 @@ main { max-width: 1600px; margin: 0 auto; padding: 44px 40px 56px; }
 .allocation-total { display: flex; flex-direction: column; align-items: center; color: var(--muted); font-size: 9px; }
 .allocation-total strong { color: var(--ink); font-size: 12px; }
 .manual-options-row { grid-template-columns: 1fr 1fr; }
+.modal-icon.team { color: #287b67; background: #d7ebe5; }
+.team-modal { width: min(600px, 100%); }
+.team-list { max-height: 310px; overflow: auto; border: 1px solid var(--line); }
+.team-member { min-height: 58px; padding: 8px 10px; display: grid; grid-template-columns: 36px minmax(0, 1fr) 30px; align-items: center; gap: 10px; border-bottom: 1px solid #e8e5dd; }
+.team-member:last-child { border-bottom: 0; }
+.team-member > .avatar { width: 34px; height: 34px; }
+.team-member > div { min-width: 0; display: flex; flex-direction: column; }
+.team-member strong { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-member span { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.team-empty { min-height: 70px; display: grid; place-items: center; color: var(--muted); font-size: 11px; }
+.add-person-form { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.add-person-form > label { margin: 0 !important; }
+.add-person-form .primary-button { height: 40px; white-space: nowrap; }
 
 @media (max-width: 1180px) {
   .workspace-grid { grid-template-columns: 1fr; }
@@ -112,6 +125,8 @@ main { max-width: 1600px; margin: 0 auto; padding: 44px 40px 56px; }
 }
 
 @media (max-width: 700px) {
+  .add-person-form { grid-template-columns: 1fr; gap: 0; }
+  .add-person-form .primary-button { margin-top: 2px; }
   .topbar { padding-inline: 18px; }.icon-button { display: none; }.primary-button { padding-inline: 11px; }
   main { padding: 28px 14px 40px; }.sprint-heading { align-items: flex-start; flex-direction: column; }.sprint-name { width: 100%; font-size: 34px; }.duration-control { width: 100%; }.duration-control select { margin-left: auto; }
   .summary-strip { grid-template-columns: 1fr 1fr; }.summary-item:nth-child(2) { border-right: 0; }.summary-item:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
