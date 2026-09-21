@@ -15,9 +15,9 @@ Sprint Planner is a Windows desktop app for turning a Jira backlog into a practi
 
 ## Install
 
-Download the latest Windows installer from [GitHub Releases](https://github.com/GS-JaKiss/Sprint-Planner/releases), run it, and follow the setup prompts.
+Download `Sprint-Planner-Windows-x64.zip` from the latest [GitHub Release](https://github.com/GS-JaKiss/Sprint-Planner/releases), extract it, and run **Sprint Planner.exe**.
 
-Release installers are currently unsigned, so Windows SmartScreen may ask you to confirm that you want to run the application.
+The application is currently unsigned, so Windows SmartScreen may ask you to confirm that you want to run it.
 
 ## Jira import
 
@@ -79,11 +79,10 @@ Sprint plans and UI preferences are stored locally by Electron. The `.env` file,
 
 ## Publishing a release
 
-The **Build and publish release** GitHub Actions workflow runs only when manually dispatched:
+The **Build release** GitHub Actions workflow runs automatically whenever a commit is pushed to `main`. It can also be run on demand without entering a tag:
 
-1. Open **Actions** in GitHub and select **Build and publish release**.
+1. Open **Actions** in GitHub and select **Build release**.
 2. Choose **Run workflow**.
-3. Enter a new tag such as `v1.0.0` and optionally mark it as a prerelease.
-4. Start the workflow.
+3. Start the workflow.
 
-The workflow installs locked dependencies, builds the Windows NSIS installer, creates the tag and GitHub Release, and attaches the `.exe` installer with generated release notes.
+The workflow installs locked dependencies, packages the x64 Windows application, and publishes `Sprint-Planner-Windows-x64.zip` as both a workflow artifact and a GitHub Release asset. It creates a unique tag automatically from the package version and workflow run number, such as `v1.0.0-build.2`, so no release tag input is required.

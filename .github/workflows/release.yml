@@ -1,25 +1,18 @@
-name: Build and publish release
+name: Build release
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Release tag (for example, v1.0.0)
-        required: true
-        type: string
-      prerelease:
-        description: Mark this release as a prerelease
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build Windows installer
+  build-windows:
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
@@ -34,16 +27,34 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build installer
-        run: npm run dist -- --publish never
+      - name: Build application
+        run: npm run build
+
+      - name: Package Windows application
+        run: npx electron-builder --win dir --x64
+
+      - name: Create ZIP archive
+        shell: powershell
+        run: Compress-Archive -Path release/win-unpacked/* -DestinationPath Sprint-Planner-Windows-x64.zip
+
+      - name: Read package version
+        id: package
+        shell: powershell
+        run: echo "version=$((Get-Content package.json | ConvertFrom-Json).version)" >> $env:GITHUB_OUTPUT
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sprint-Planner-Windows-x64
+          path: Sprint-Planner-Windows-x64.zip
+          if-no-files-found: error
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
+          tag_name: v${{ steps.package.outputs.version }}-build.${{ github.run_number }}
           target_commitish: ${{ github.sha }}
-          name: Sprint Planner ${{ inputs.tag }}
+          name: Sprint Planner v${{ steps.package.outputs.version }} build ${{ github.run_number }}
           generate_release_notes: true
-          prerelease: ${{ inputs.prerelease }}
           fail_on_unmatched_files: true
-          files: release/*.exe
+          files: Sprint-Planner-Windows-x64.zip
